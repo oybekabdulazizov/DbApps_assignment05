@@ -26,7 +26,7 @@ namespace Project01.Controllers
         {
 
             var result = _idbService.EnrollStudents(request);
-            if (_idbService.EnrollStudents(request) == null)
+            if (result == null)
             {
                 return BadRequest("Something went wrong!");
             }

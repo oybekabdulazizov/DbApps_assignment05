@@ -48,7 +48,7 @@ namespace Project01.Services
                     dataReader1.Close();
 
                     // for the existing study, let's find an entry with semester=1 
-                    DateTime currentDate = DateTime.UtcNow;
+                    DateTime currentDate = DateTime.Now;
                     command.CommandText = @"SELECT MAX(IdEnrollment) AS MaxId FROM Enrollment 
                                         WHERE Semester=1 AND IdStudy=@idStudy;";
                     command.Parameters.AddWithValue("idStudy", _idStudy);
@@ -58,47 +58,57 @@ namespace Project01.Services
 
                     if (dataReader2.Read())
                     {
-                        latestEntry = int.Parse(dataReader2["MaxId"].ToString());
-                        dataReader2.Close();
-                    }
-                    else
-                    {
-                        dataReader2.Close();
-                        command.CommandText = @"SELECT MAX(IdEnrollment) AS MaxId FROM Enrollment;";
-                        var dataReader3 = command.ExecuteReader();
-                        // let's check if there any enrollment exists 
-                        if (dataReader3.Read())
+
+                        var result = dataReader2["MaxId"].ToString();
+                        if (!string.IsNullOrEmpty(result))
                         {
-                            latestEntry = int.Parse(dataReader3["MaxId"].ToString());
+                            latestEntry = int.Parse(result);
+                            dataReader2.Close();
+                        }
+                        else
+                        {
+                            dataReader2.Close();
+                            command.CommandText = @"SELECT MAX(IdEnrollment) AS MaxId FROM Enrollment;";
+                            var dataReader3 = command.ExecuteReader();
+                            // let's check if there any enrollment exists 
+                            if (dataReader3.Read())
+                            {
+
+                                var maxId = dataReader3["MaxId"].ToString();
+                                if (!string.IsNullOrEmpty(maxId))
+                                {
+                                    latestEntry = int.Parse(maxId);
+                                }
+
+                                latestEntry++;
+                                dataReader3.Close();
+                                command.CommandText = @"INSERT INTO Enrollment VALUES (@idEnroll, @_semester, @_idStudy, @_startDate)";
+                                command.Parameters.AddWithValue("idEnroll", latestEntry);
+                                command.Parameters.AddWithValue("_semester", _semester);
+                                command.Parameters.AddWithValue("_idStudy", _idStudy);
+                                command.Parameters.AddWithValue("_startDate", currentDate);
+                                command.ExecuteNonQuery();
+                            }
                         }
 
-                        // adding a new enrollment
-                        latestEntry++;
-                        dataReader3.Close();
-                        command.CommandText = @"INSERT INTO Enrollment VALUES (@idEnrollment, @semester, @idStudy, @startDate)";
-                        command.Parameters.AddWithValue("idEnrollment", latestEntry);
-                        command.Parameters.AddWithValue("semester", _semester);
-                        command.Parameters.AddWithValue("idStudy", _idStudy);
-                        command.Parameters.AddWithValue("startDate", currentDate);
-                        command.ExecuteNonQuery();
                     }
 
                     // here, we check if newly entered index number is assigned to another student. 
                     // If a student already exists with the given index number, we return error
                     // If not, then with that index number, we insert a new student into Students table
-                    command.CommandText = @"SELECT FirstName FROM Student WHERE IndexNumber=@indexNumber;";
-                    command.Parameters.AddWithValue("indexNumber", request.IndexNumber);
+                    command.CommandText = @"SELECT FirstName FROM Student WHERE IndexNumber=@idStudent;";
+                    command.Parameters.AddWithValue("idStudent", request.IndexNumber);
                     using var dataReader4 = command.ExecuteReader();
                     if (!dataReader4.Read())
                     {
                         dataReader4.Close();
                         command.CommandText =
-                            @"INSERT INTO Student VALUES (@idStudent, @firstName, @lastName, CONVERT(DATE, @birthdate, 103), @idEnroll);";
-                        command.Parameters.AddWithValue("idStudent", request.IndexNumber);
-                        command.Parameters.AddWithValue("firstName", request.FirstName);
-                        command.Parameters.AddWithValue("lastName", request.LastName);
-                        command.Parameters.AddWithValue("birthdate", request.BirthDate);
-                        command.Parameters.AddWithValue("idEnroll", latestEntry);
+                            @"INSERT INTO Student VALUES (@id, @name, @surname, CONVERT(DATE, @dob, 103), @idE);";
+                        command.Parameters.AddWithValue("@id", request.IndexNumber);
+                        command.Parameters.AddWithValue("@name", request.FirstName);
+                        command.Parameters.AddWithValue("@surname", request.LastName);
+                        command.Parameters.AddWithValue("@dob", request.BirthDate);
+                        command.Parameters.AddWithValue("@idE", latestEntry);
 
                         command.ExecuteNonQuery();
                     }
@@ -109,17 +119,17 @@ namespace Project01.Services
                     }
 
                     transaction.Commit();
-                    response = new EnrollmentResponse
-                    {
-                        FirstName = request.FirstName,
-                        LastName = request.LastName,
-                        Studies = request.Studies,
-                        Semester = _semester
-                    };
+
+                    // Done :)
+                    response = new EnrollmentResponse();
+                    response.FirstName = request.FirstName;
+                    response.LastName = request.LastName;
+                    response.Studies = request.Studies;
+                    response.Semester = _semester;
+
+                    return response;
                 }
             }
-            // Done :) 
-            return response;
         }
 
 
